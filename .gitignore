@@ -5,3 +5,6 @@ outputs/
 checkpoints/*.pt
 checkpoints/*.pth
 checkpoints/*.safetensors
+checkpoints/.cache/
+/huggingface
+/tests/

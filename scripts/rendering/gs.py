@@ -22,7 +22,9 @@ class GaussianRenderer:
         scales = gaussians[..., 4:7].contiguous().float()
         rotations = gaussians[..., 7:11].contiguous().float()
         colors = gaussians[..., 11:].contiguous().float()
-        colors = colors.reshape(*colors.shape[:-1], -1, 3)
+        sh_degree = self._sh_degree()
+        if sh_degree > 0:
+            colors = colors.reshape(*colors.shape[:-1], -1, 3)
 
         viewmats = cam_view.float().transpose(3, 2)
         intrinsics = intrinsics.to(device=means.device, dtype=means.dtype)
@@ -59,7 +61,7 @@ class GaussianRenderer:
                 packed=False,
                 backgrounds=backgrounds[index],
                 render_mode="RGB+ED",
-                sh_degree=self._sh_degree(),
+                sh_degree=sh_degree if sh_degree > 0 else None,
             )
             for image, alpha_map, projected in zip(rendered, alpha, info["means2d"]):
                 images.append(image[..., :3].permute(2, 0, 1))
@@ -83,6 +85,8 @@ class GaussianRenderer:
         scales = gaussians[0, :, 4:7].contiguous().float()
         rotations = gaussians[0, :, 7:11].contiguous().float()
         sh = gaussians[0, :, 11:].contiguous().float().reshape(means.shape[0], -1, 3)
+        if self._sh_degree() == 0:
+            sh = (sh - 0.5) / 0.28209479177387814
         keep = opacity.squeeze(-1) >= opacity_threshold
         means, opacity, scales, rotations, sh = (
             value[keep] for value in (means, opacity, scales, rotations, sh)

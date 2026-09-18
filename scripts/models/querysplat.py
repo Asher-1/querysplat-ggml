@@ -154,14 +154,10 @@ class QuerySplat(nn.Module):
         )
         return self.original_k_proj_norm(keys), values
 
-    def forward_encoder(self, encoder_input: ModelInputEncoder) -> EncoderLatent:
+    def _encoder_features(self, encoder_input: ModelInputEncoder):
         vggt_output, cam_view, intrinsics, _ = self.vggt_encoder.forward_with_cameras(
             encoder_input.images_rgb_unnormalized,
             image_hw=self.img_size,
-        )
-        keys, values = self.enc_dec_backbone._encode_to_kv(
-            vggt_output.tokens,
-            run_encoder=False,
         )
         plucker = self._plucker_from_vggt_cameras(
             cam_view,
@@ -170,15 +166,32 @@ class QuerySplat(nn.Module):
             device=encoder_input.images_rgb.device,
         )
         rgb_tokens = self._original_encoder_tokens(encoder_input, plucker)
+        return vggt_output, rgb_tokens, cam_view, intrinsics
+
+    def _features_to_latent(self, geo_tokens, rgb_tokens, eye_token, layer_weights):
+        keys, values = self.enc_dec_backbone._encode_to_kv(geo_tokens, run_encoder=False)
         post_rgb_keys, post_rgb_values = self._original_tokens_to_kv(rgb_tokens)
         return EncoderLatent(
             keys=keys,
             values=values,
             post_rgb_keys=post_rgb_keys,
             post_rgb_values=post_rgb_values,
-            eye_token=vggt_output.eye_token,
-            layer_weights=vggt_output.layer_weights,
+            eye_token=eye_token,
+            layer_weights=layer_weights,
         )
+
+    def forward_encoder_with_cameras(
+        self, encoder_input: ModelInputEncoder
+    ) -> tuple[EncoderLatent, torch.Tensor, torch.Tensor]:
+        """Encode input images once, returning their reconstruction reference cameras."""
+        output, rgb_tokens, cam_view, intrinsics = self._encoder_features(encoder_input)
+        latent = self._features_to_latent(
+            output.tokens, rgb_tokens, output.eye_token, output.layer_weights
+        )
+        return latent, cam_view, intrinsics
+
+    def forward_encoder(self, encoder_input: ModelInputEncoder) -> EncoderLatent:
+        return self.forward_encoder_with_cameras(encoder_input)[0]
 
     def get_gs_tokens(self, batch_size: int) -> torch.Tensor:
         return self.gs_tokens.unsqueeze(0).repeat(batch_size, 1, 1)
@@ -211,12 +224,15 @@ class QuerySplat(nn.Module):
 
     def _activate_post_output(self, raw: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         raw_color = raw[..., : self.color_dim]
-        sh_basis_count = (self.opt.gaussian_sh_degree + 1) ** 2
-        sh = raw_color.reshape(*raw_color.shape[:-1], sh_basis_count, 3)
-        dc_rgb = 0.5 * torch.tanh(sh[..., 0, :]) + 0.5
-        dc = (dc_rgb - 0.5) / 0.28209479177387814
-        rest = effective_gaussian_sh_rest_scale(self.opt, None) * torch.tanh(sh[..., 1:, :])
-        color = torch.cat([dc.unsqueeze(-2), rest], dim=-2).flatten(start_dim=-2)
+        if self.opt.gaussian_sh_degree == 0:
+            color = 0.5 * torch.tanh(raw_color) + 0.5
+        else:
+            sh_basis_count = (self.opt.gaussian_sh_degree + 1) ** 2
+            sh = raw_color.reshape(*raw_color.shape[:-1], sh_basis_count, 3)
+            dc_rgb = 0.5 * torch.tanh(sh[..., 0, :]) + 0.5
+            dc = (dc_rgb - 0.5) / 0.28209479177387814
+            rest = effective_gaussian_sh_rest_scale(self.opt, None) * torch.tanh(sh[..., 1:, :])
+            color = torch.cat([dc.unsqueeze(-2), rest], dim=-2).flatten(start_dim=-2)
         opacity = torch.sigmoid(raw[..., self.color_dim : self.color_dim + 1] - 2.0)
         return color, opacity
 
@@ -255,13 +271,18 @@ class QuerySplat(nn.Module):
         lr: float,
         lpips_weight: float,
         save_steps: list[int],
+        optimization_target: str = "kv",
     ) -> torch.Tensor:
         if n_steps < 0:
             raise ValueError("--tto_n_steps must be non-negative")
+        if optimization_target not in {"kv", "features"}:
+            raise ValueError("optimization_target must be 'kv' or 'features'")
         if lpips_weight > 0:
             self._ensure_lpips(model_input.encoder.images_rgb_unnormalized.device)
         with _frozen_parameters(self):
-            return self._optimize_memory(model_input, n_steps, lr, lpips_weight, set(save_steps))
+            return self._optimize_memory(
+                model_input, n_steps, lr, lpips_weight, set(save_steps), optimization_target
+            )
 
     def _optimize_memory(
         self,
@@ -270,27 +291,35 @@ class QuerySplat(nn.Module):
         lr: float,
         lpips_weight: float,
         save_steps: set[int],
+        optimization_target: str = "kv",
     ) -> torch.Tensor:
         with torch.no_grad():
-            latent = self.forward_encoder(model_input.encoder)
-        geo_keys = latent.keys.detach().requires_grad_(True)
-        geo_values = latent.values.detach().requires_grad_(True)
-        rgb_keys = latent.post_rgb_keys.detach().requires_grad_(True)
-        rgb_values = latent.post_rgb_values.detach().requires_grad_(True)
-        eye_token = latent.eye_token.detach() if latent.eye_token is not None else None
-        layer_weights = latent.layer_weights.detach() if latent.layer_weights is not None else None
+            if optimization_target == "kv":
+                latent = self.forward_encoder(model_input.encoder)
+                memory = [latent.keys, latent.values, latent.post_rgb_keys, latent.post_rgb_values]
+                eye_token, layer_weights = latent.eye_token, latent.layer_weights
+            else:
+                output, rgb_tokens, _, _ = self._encoder_features(model_input.encoder)
+                memory = [output.tokens, rgb_tokens]
+                eye_token, layer_weights = output.eye_token, output.layer_weights
+        memory = [value.detach().requires_grad_(True) for value in memory]
+        eye_token = eye_token.detach() if eye_token is not None else None
+        layer_weights = layer_weights.detach() if layer_weights is not None else None
         ground_truth = model_input.encoder.images_rgb_unnormalized
         self.last_tto_step_gaussians: dict[int, torch.Tensor] = {}
 
         def decode() -> torch.Tensor:
-            current = EncoderLatent(
-                keys=geo_keys,
-                values=geo_values,
-                post_rgb_keys=rgb_keys,
-                post_rgb_values=rgb_values,
-                eye_token=eye_token,
-                layer_weights=layer_weights,
-            )
+            if optimization_target == "features":
+                current = self._features_to_latent(*memory, eye_token, layer_weights)
+            else:
+                current = EncoderLatent(
+                    keys=memory[0],
+                    values=memory[1],
+                    post_rgb_keys=memory[2],
+                    post_rgb_values=memory[3],
+                    eye_token=eye_token,
+                    layer_weights=layer_weights,
+                )
             return self.forward_decoder(current)
 
         def capture(step: int) -> None:
@@ -299,7 +328,7 @@ class QuerySplat(nn.Module):
                     self.last_tto_step_gaussians[step] = decode().detach().cpu()
 
         capture(0)
-        optimizer = torch.optim.Adam([geo_keys, geo_values, rgb_keys, rgb_values], lr=lr)
+        optimizer = torch.optim.Adam(memory, lr=lr)
         with torch.set_grad_enabled(True):
             for index in range(n_steps):
                 optimizer.zero_grad()

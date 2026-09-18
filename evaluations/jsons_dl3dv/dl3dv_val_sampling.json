@@ -1,0 +1,65 @@
+{
+  "dataset_path": "data/DL3DV-Evaluation",
+  "2views": {
+    "total_samples": 300,
+    "num_interp_views": 4,
+    "num_extrap_views": 4,
+    "small": {
+      "min_window": 10,
+      "max_window": 20,
+      "extrap_width": 4
+    },
+    "medium": {
+      "min_window": 20,
+      "max_window": 40,
+      "extrap_width": 8
+    },
+    "large": {
+      "min_window": 40,
+      "max_window": 80,
+      "extrap_width": 12
+    }
+  },
+  "4views": {
+    "total_samples": 300,
+    "num_interp_views": 4,
+    "num_extrap_views": 4,
+    "small": {
+      "min_window": 10,
+      "max_window": 20,
+      "extrap_width": 5
+    },
+    "medium": {
+      "min_window": 20,
+      "max_window": 40,
+      "extrap_width": 10
+    },
+    "large": {
+      "min_window": 40,
+      "max_window": 80,
+      "extrap_width": 15
+    }
+  },
+  "12views": {
+    "total_samples": 300,
+    "num_interp_views": 4,
+    "num_extrap_views": 4,
+    "input_sampling": "uniform",
+    "uniform_input_frame_sampling_k": 10.0,
+    "small": {
+      "min_window": 30,
+      "max_window": 60,
+      "extrap_width": 15
+    },
+    "medium": {
+      "min_window": 60,
+      "max_window": 120,
+      "extrap_width": 30
+    },
+    "large": {
+      "min_window": 120,
+      "max_window": 240,
+      "extrap_width": 45
+    }
+  }
+}

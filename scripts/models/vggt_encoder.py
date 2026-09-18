@@ -328,6 +328,14 @@ class VGGTEncoder(nn.Module):
         )
         return output, cam_view, intrinsics, pose_enc
 
+    def predict_cameras(
+        self, images: torch.Tensor, image_hw: tuple[int, int]
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Estimate cameras without decoding depths or reconstruction features."""
+        final_index = self.aggregator.depth - 1
+        output, _ = self._run_selected_layers(images, {final_index})
+        return self._decode_cameras(output[final_index], image_hw)
+
     def predict_cameras_and_depths(
         self,
         images: torch.Tensor,

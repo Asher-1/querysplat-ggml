@@ -8,6 +8,11 @@
 
 This repository contains the official inference implementation of QuerySplat. The release includes custom-image preprocessing, 3D Gaussian prediction and rendering, VGGT-Omega camera/depth prediction, and optional test-time optimization (TTO).
 
+## Updates
+
+- **2026-09-18**: Added the paper checkpoint, DL3DV evaluation code and splits, and evaluation results and protocol documentation.
+- **2026-08-04**: Initial release of QuerySplat inference code and pretrained weights.
+
 ## Installation
 
 QuerySplat requires Linux, a CUDA-capable NVIDIA GPU, and CUDA-enabled PyTorch. The release has been tested with Python 3.12, PyTorch 2.11, and CUDA 12.8.
@@ -89,6 +94,62 @@ Omit `--use_tto` to run the feed-forward model without test-time optimization.
 - `--save_vggt_input_depths`: Export per-view VGGT-Omega depth and confidence products.
 - `--save_vggt_depth_pointcloud`: Export a colored point cloud reconstructed from VGGT-Omega depth predictions.
 - `--vggt_depth_pointcloud_target_points N`: Target number of depth point-cloud samples; required with `--save_vggt_depth_pointcloud`.
+
+## Evaluations
+
+We evaluate on [DL3DV-Evaluation](https://huggingface.co/datasets/DL3DV/DL3DV-Evaluation/tree/main) using 2, 4, and 12 input views across small, medium, and large temporal windows. The nine fixed evaluation splits in `evaluations/jsons_dl3dv/` each contain 300 cases, with four interpolation and four extrapolation target views per case.
+
+We provide two checkpoints with different strengths. The paper uses `querysplat_vggto_1B_512_paper` ([download](https://huggingface.co/inspatio/querysplat/resolve/main/querysplat_vggto_1B_512_paper.safetensors)), which uses SH degree 0 and achieves better evaluation metrics. The previously released `querysplat_vggto_1B_512_8192` ([download](https://huggingface.co/inspatio/querysplat/resolve/main/querysplat_vggto_1B_512_8192.safetensors)) uses SH degree 1 and produces visually better scene reconstructions. Use the paper checkpoint to reproduce the reported results, or the previous release when visual reconstruction quality is the priority.
+
+The table reports interpolation results without TTO, averaged over the small, medium, and large splits. Higher PSNR/SSIM and lower LPIPS are better. **Bold** and <u>underlined</u> values indicate the best and second-best results between the two checkpoints.
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2">Method</th>
+      <th rowspan="2">Pose-free</th>
+      <th colspan="3">2 views</th>
+      <th colspan="3">4 views</th>
+      <th colspan="3">12 views</th>
+    </tr>
+    <tr>
+      <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th>
+      <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th>
+      <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>querysplat_vggto_1B_512_8192</code></td><td align="center">✓</td>
+      <td><u>21.2392</u></td><td><u>0.6973</u></td><td><u>0.2757</u></td>
+      <td><u>24.3436</u></td><td><u>0.7937</u></td><td><u>0.2013</u></td>
+      <td><u>23.6938</u></td><td><u>0.7660</u></td><td><u>0.2441</u></td>
+    </tr>
+    <tr>
+      <td><code>querysplat_vggto_1B_512_paper</code></td><td align="center">✓</td>
+      <td><strong>21.3888</strong></td><td><strong>0.6990</strong></td><td><strong>0.2585</strong></td>
+      <td><strong>24.5765</strong></td><td><strong>0.8002</strong></td><td><strong>0.1843</strong></td>
+      <td><strong>23.7005</strong></td><td><strong>0.7685</strong></td><td><strong>0.2297</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+> [!IMPORTANT]
+> In all paper evaluations, **pose-free methods** use their own pose estimator in two forward passes. The first uses only input views to reconstruct the scene and establish reference cameras. The second uses input and target views to predict target-camera parameters, aligned to the reconstruction through the shared input cameras. Target images are used only for camera estimation and scoring; reconstruction and TTO use only input views. **Pose-required methods** directly use the dataset-provided target-camera parameters.
+
+To evaluate all nine splits with the paper checkpoint, run the following from the repository root. Set `--dataset-root` to the extracted DL3DV-Evaluation directory containing the scene folders. Reconstruction uses 512×512 images; rendering and scoring use 256×256.
+
+```bash
+python -m evaluations.evaluate_jsons \
+  --config checkpoints/querysplat_vggto_1B_512_paper.yaml \
+  --checkpoint checkpoints/querysplat_vggto_1B_512_paper.safetensors \
+  --dataset-root /path/to/DL3DV-Evaluation \
+  --input-resolution 256x256 \
+  --gpus 0,1,2,3 \
+  --output-dir outputs/evaluations/paper
+```
+
+For the previous checkpoint, replace `paper` with `8192` in the config/checkpoint paths and use a separate output directory. For TTO20 or TTO50, append `--use-tto --tto-n-steps 20 --tto-optimization-target kv` or change the step count to `50`.
 
 ## Acknowledgements
 
