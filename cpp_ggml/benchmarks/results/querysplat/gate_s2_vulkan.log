@@ -1,0 +1,67 @@
+== [1/5] frames ==
+wrote /tmp/qs_gate_paper_vulkan/frames.bin: S=2 H=512 W=512 (6291456 bytes)
+== [2/5] converter ==
+decoder GGUF exists: /home/asher/develop/code/dl/querysplat-ggml/cpp_ggml/models/gguf/querysplat-paper-f32.gguf
+== [3/5] spy (torch reference) ==
+/home/asher/develop/code/dl/querysplat-ggml/scripts/models/vggt_encoder.py:47: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  return torch.cuda.amp.autocast(enabled=False)
+{"arch": "querysplat-official-py", "device": "cuda", "num_input_views": 2, "camera_and_depth_seconds": 0.2841949139838107, "image_to_3dgs_seconds": 1.3234576870454475, "total_seconds": 1.6076526010292582}
+saving 17 seams to /tmp/qs_gate_paper_vulkan/spy
+  cpp_tokens: (1, 2082, 2048)
+  cpp_pose_enc: (2, 9)
+  cpp_cam_view: (2, 4, 4)
+  cpp_intrinsics: (2, 4)
+  cpp_plucker: (2, 6, 512, 512)
+  cpp_pe_conv_pre: (2, 1024, 2048)
+  cpp_ppe_conv_pre: (2, 1024, 2048)
+  cpp_geom_kvproj: (1, 2082, 4096)
+  cpp_geom_kv_k: (1, 16, 2082, 128)
+  cpp_geom_kv_v: (1, 16, 2082, 128)
+  cpp_rgb_tokens: (1, 2048, 2048)
+  cpp_post_kv_k: (1, 16, 2048, 128)
+  cpp_post_kv_v: (1, 16, 2048, 128)
+  cpp_geom_tokens: (1, 8192, 2048)
+  cpp_deconv_raw: (1, 8192, 640)
+  cpp_color_raw: (1, 8192, 256)
+  cpp_gaussians: (524288, 14)
+done
+== [4/5] querysplat-cli ==
+ggml_vulkan: Found 1 Vulkan devices:
+ggml_vulkan: 0 = NVIDIA GeForce RTX 4090 (NVIDIA) | uma: 0 | fp16: 0 | bf16: 1 | fp4: 0 | warp size: 32 | shared memory: 49152 | int dot: 0 | matrix cores: none
+[mapggml] loaded /home/asher/develop/code/dl/querysplat-ggml/cpp_ggml/models/gguf/vggt-omega-1b-512-f32.gguf: 1639 tensors, dtype=f32, patch=16, dim=1024, depth=24+24
+[mapggml]   arch=vggt_omega mean={0.485,0.456,0.406} std={0.229,0.224,0.225} dec_dim=0 dec_heads=0
+[mapggml] weights staged: 1639 tensors, buffer 4.58 GB
+[mapggml] vggt: weights staged, building graph
+[mapggml] graph built: 6623 nodes (backbone+aggregator+heads)
+[mapggml] encoder: tokens=17055744 pose=18 depth=524288 (out 512x512) token_start=17
+[mapggml] loaded /home/asher/develop/code/dl/querysplat-ggml/cpp_ggml/models/gguf/querysplat-paper-f32.gguf: 521 tensors, dtype=?, patch=16, dim=1024, depth=24+24
+[mapggml]   arch=querysplat mean={0.485,0.456,0.406} std={0.229,0.224,0.225} dec_dim=0 dec_heads=0
+[mapggml] querysplat: staged 521 tensors (4.47 GB)
+[mapggml] querysplat: layer_weights = 0.0000 0.0341 0.8926 0.0732
+[mapggml] decoder: C=2048 heads=16 dec_depth=12 post_depth=6 gs_tokens=8192 gpt=64 sh=0
+[mapggml] querysplat: graph built in 11 ms (S=2 P=1024 Nagg=1041 T=8193 post_out=4)
+[mapggml] gaussians: N=524288 stride=14
+[mapggml] wrote /tmp/qs_gate_paper_vulkan/cpp_gaussians.ply
+[mapggml] wrote /tmp/qs_gate_paper_vulkan/cpp_gaussians.bin
+[mapggml] wrote /tmp/qs_gate_paper_vulkan/cpp_cameras.bin
+[mapggml] timing: model_load=9.89s input=0.004s camera_and_depth=0.59s camera_math=0.006s image_to_3dgs=1.79s render=0.00s write=0.02s total=12.30s peak_rss=13293 MB
+[mapggml] wrote /tmp/qs_gate_paper_vulkan/cpp_timing.json
+== [5/5] compare ==
+seam                       max_abs     rel_max    mean_abs   mean_th    rel_th verdict
+cpp_pose_enc             1.013e-06   1.014e-06   2.042e-07   1.0e-04   1.0e-04 PASS  corr=+1.0000 rel_mean=8.38e-07
+cpp_intrinsics           1.465e-03   1.719e-06   4.730e-04  -1.0e-04   2.0e-04 PASS  corr=+1.0000 rel_mean=8.65e-07
+cpp_plucker              8.643e-07   8.643e-07   1.111e-07   1.0e-04   1.0e-04 PASS  corr=+1.0000 rel_mean=5.26e-07
+cpp_tokens               2.340e-03   6.923e-05   6.811e-06   3.0e-03   2.0e-02 PASS  corr=+1.0000 rel_mean=1.08e-05
+cpp_rgb_tokens           1.144e-05   5.276e-07   5.549e-07   4.0e-04   1.0e-03 PASS  corr=+1.0000 rel_mean=5.96e-07
+cpp_geom_kvproj          4.267e-03   1.044e-04   1.406e-05  -4.5e-02   4.5e-02 PASS  corr=+1.0000 rel_mean=9.25e-06
+cpp_geom_kv_k            2.354e-03   1.405e-04   1.215e-05  -4.5e-02   4.5e-02 PASS  corr=+1.0000 rel_mean=8.28e-06
+cpp_geom_kv_v            7.653e-04   8.471e-05   8.339e-06  -4.5e-02   4.5e-02 PASS  corr=+1.0000 rel_mean=1.06e-05
+cpp_post_kv_k            1.364e-04   2.147e-06   1.910e-06  -1.0e-02   2.0e-02 PASS  corr=+1.0000 rel_mean=3.71e-07
+cpp_post_kv_v            2.766e-05   1.708e-06   9.918e-07  -1.0e-02   2.0e-02 PASS  corr=+1.0000 rel_mean=5.99e-07
+cpp_geom_tokens          1.744e-03   7.288e-05   1.635e-06   7.5e-04   1.2e-02 PASS  corr=+1.0000 rel_mean=2.89e-05
+cpp_deconv_raw           9.323e-03   8.735e-04   1.805e-05   5.7e-03   1.2e-01 PASS  corr=+1.0000 rel_mean=1.50e-05
+cpp_color_raw            5.203e-01   1.269e-02   1.097e-03   1.6e-01   8.0e-01 PASS  corr=+1.0000 rel_mean=8.83e-04
+cpp_gaussians            1.285e-01   4.198e-02   7.568e-05   1.1e-02   6.2e-01 PASS  corr=+1.0000 rel_mean=2.40e-04
+cpp_cam_view             4.475e-07           -   6.881e-08   1.0e-04         - PASS
+
+GATE PASS

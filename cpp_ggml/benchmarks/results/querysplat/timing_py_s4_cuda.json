@@ -1,0 +1,13 @@
+{
+  "side": "official py (torch)",
+  "device": "cuda",
+  "num_input_views": 4,
+  "scenes": [
+    "case0",
+    "case1",
+    "courtyard"
+  ],
+  "camera_and_depth_seconds": 0.6631,
+  "image_to_3dgs_seconds": 1.9274,
+  "render_seconds": 0.2991
+}

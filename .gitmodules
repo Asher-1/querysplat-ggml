@@ -1,0 +1,3 @@
+[submodule "cpp_ggml/third_party/map-anything-ggml"]
+	path = cpp_ggml/third_party/map-anything-ggml
+	url = https://github.com/Asher-1/map-anything-ggml.git

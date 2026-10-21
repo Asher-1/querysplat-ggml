@@ -1,0 +1,19 @@
+{
+  "side": "cpp_ggml",
+  "device": "cuda",
+  "quant": "f32",
+  "num_input_views": 4,
+  "scenes": [
+    "case0",
+    "case1",
+    "courtyard"
+  ],
+  "model_load_seconds": 9.7393,
+  "input_seconds": 0.529,
+  "camera_and_depth_seconds": 0.8786,
+  "camera_math_seconds": 0.023,
+  "image_to_3dgs_seconds": 1.9267,
+  "render_seconds": 0.3972,
+  "write_seconds": 0.2112,
+  "total_seconds": 13.705
+}

@@ -8,8 +8,42 @@
 
 This repository contains the official inference implementation of QuerySplat. The release includes custom-image preprocessing, 3D Gaussian prediction and rendering, VGGT-Omega camera/depth prediction, and optional test-time optimization (TTO).
 
+## ⚡ Native C++ / GGML inference (`cpp_ggml`)
+
+The full QuerySplat chain — VGGT-Omega encoder, QuerySplat decoder, 3DGS assembly and rendering — also runs as a **single pure-C++ process on [ggml](https://github.com/ggml-org/ggml)** (embedded via [map-anything-ggml](cpp_ggml/third_party/map-anything-ggml)): no Python, no PyTorch at runtime, real images straight from disk (`--images`, stb-decoded in C++).
+
+**Aligned with the official torch chain** (paper checkpoint, S=4, 512×512, 3 reference scenes, f32-accuracy default mode; [full matrix](cpp_ggml/benchmarks/charts/querysplat/alignment_matrix.md)):
+
+| Tier (encoder + decoder GGUF) | size | cpp-vs-py render PSNR (CUDA / Vulkan / CPU) | cpp-vs-GT (official py: 26.85) | encoder+decoder s (CUDA / Vulkan / CPU) |
+|---|---|---|---|---|
+| f32 | 4.58 + 4.47 GB | 52.1 / 63.4 / 62.1 dB | 26.85 | 2.80 / 2.67 / 84.9 |
+| f16 | 2.29 + 2.30 GB | 45.4 / 45.6 / 45.6 dB | 26.84 | 2.76 / 2.66 / 82.7 |
+| q8_0 | 1.32 + 1.31 GB | 34.5 / 34.5 / 34.5 dB | 26.89 | 2.85 / 2.51 / 85.5 |
+| official py (torch CUDA) | — | — | 26.85 | 2.59 |
+
+Every tier reconstructs at the official quality vs ground truth (±0.04 dB); the GPU rows run at the official CUDA speed (2.5-2.9 s vs 2.59 s) in the default exact-f32 mode (`--cuda-fast` / `--vk-fast` trade that exactness for the fp16 kernels).
+
+![per-stage latency](cpp_ggml/benchmarks/charts/querysplat/e2e_latency_bar.png)
+
+![latency matrix](cpp_ggml/benchmarks/charts/querysplat/latency_matrix.png)
+
+![cpp-vs-py alignment](cpp_ggml/benchmarks/charts/querysplat/alignment_cpp_vs_py_matrix.png)
+
+Real-scene end-to-end reconstruction vs ground truth (cpp | official py | GT | diff):
+
+![DL3DV reconstruction](cpp_ggml/benchmarks/charts/querysplat/recon_dl3dv_case0_cpp_py_gt.png)
+
+- **Backends**: CPU / CUDA / Vulkan, all parity-audited against the official torch graph (seam gate + render agreement).
+- **GGUF tiers**: f32 (parity reference) / f16 (half size, staged as f32 at load) / q8_0 (smallest). q6_K was dropped: against q8_0 its only edge was a 0.27 GB smaller decoder (~0.5 s faster load), while it lost 0.7-1.9 dB vs GT in every measured scene × backend cell.
+- **One command, zero setup**: `./run_querysplat.sh quick` (demo), `./run_querysplat.sh cpp --input your/images --out outputs/scene`, `./run_querysplat.sh compare --input your/images` (cpp vs official python + PSNR), `./run_querysplat.sh help`.
+
+Full methodology, per-seam tables and the illustrated benchmark report: [`cpp_ggml/README.md`](cpp_ggml/README.md) · [`cpp_ggml/benchmarks/charts/querysplat/querysplat_report.md`](cpp_ggml/benchmarks/charts/querysplat/querysplat_report.md).
+
 ## Updates
 
+- **2026-10-17**: Full torch alignment — rasterizer gsplat semantics (frustum clamp, 1/255 alpha floor), exact-f32 CUDA attention/GEMM, f32 im2col, antialiased resize + libjpeg decode, q8_0 activation fix; paper decoder family; legacy tier cleanup (rationale in GGUF tiers above).
+- **2026-10-15**: Full backend × quantization latency matrix (11 rows incl. official py CUDA), CUDA f16/f32 gates, and real-scene end-to-end comparisons (ETH3D courtyard + DL3DV case0) — cpp within 0.5 dB of the official python chain on DL3DV at 1.5x its CUDA speed.
+- **2026-10-14**: Added `cpp_ggml` — pure C++ ggml inference chain (VGGT-Omega encoder + QuerySplat decoder + 3DGS + rendering), parity-gated against the official Python graph, with CPU/CUDA/Vulkan backends, quantized decoder GGUFs, and a one-click runner (`run_querysplat.sh`).
 - **2026-09-18**: Added the paper checkpoint, DL3DV evaluation code and splits, and evaluation results and protocol documentation.
 - **2026-08-04**: Initial release of QuerySplat inference code and pretrained weights.
 

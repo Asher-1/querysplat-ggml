@@ -8,3 +8,11 @@ checkpoints/*.safetensors
 checkpoints/.cache/
 /huggingface
 /tests/
+
+# cpp_ggml
+cpp_ggml/build-*/
+cpp_ggml/models/gguf/*.gguf
+cpp_ggml/models/pytorch/
+data/
+# build artifacts
+compile_commands.json

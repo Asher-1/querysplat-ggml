@@ -1,0 +1,19 @@
+{
+  "side": "cpp_ggml",
+  "device": "vulkan",
+  "quant": "f32",
+  "num_input_views": 4,
+  "scenes": [
+    "case0",
+    "case1",
+    "courtyard"
+  ],
+  "model_load_seconds": 10.6761,
+  "input_seconds": 0.5649,
+  "camera_and_depth_seconds": 0.8818,
+  "camera_math_seconds": 0.0244,
+  "image_to_3dgs_seconds": 1.7881,
+  "render_seconds": 0.4061,
+  "write_seconds": 0.2225,
+  "total_seconds": 14.5639
+}

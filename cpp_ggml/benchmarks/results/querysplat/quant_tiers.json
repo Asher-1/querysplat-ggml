@@ -1,0 +1,27 @@
+{
+  "comment": "paper decoder + VGGT-Omega encoder, S=4, 512x512; means over every backend x scene of alignment_matrix.py",
+  "py_vs_gt_db": 26.85,
+  "tiers": [
+    {
+      "tier": "f32",
+      "encoder_gb": 4.58,
+      "decoder_gb": 4.47,
+      "mean_cpp_vs_py_db": 59.18,
+      "mean_cpp_vs_gt_db": 26.85
+    },
+    {
+      "tier": "f16",
+      "encoder_gb": 2.29,
+      "decoder_gb": 2.3,
+      "mean_cpp_vs_py_db": 45.56,
+      "mean_cpp_vs_gt_db": 26.84
+    },
+    {
+      "tier": "q8_0",
+      "encoder_gb": 1.32,
+      "decoder_gb": 1.31,
+      "mean_cpp_vs_py_db": 34.52,
+      "mean_cpp_vs_gt_db": 26.89
+    }
+  ]
+}
